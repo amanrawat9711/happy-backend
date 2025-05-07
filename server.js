@@ -13,7 +13,7 @@ connectCloudinary();
 
 app.use(express.json());
 app.use(cors({
-    origin: "https://animation-front-eight.vercel.app/",
+    origin: "https://animation-front-eight.vercel.app",
     credentials: true 
   }));
   
