@@ -1,6 +1,14 @@
+// controllers/animationController.js
 import ImageModel from "../models/animationModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from 'fs';
+
+// Cloudinary configuration
+cloudinary.config({
+  cloud_name: 'YOUR_CLOUD_NAME',
+  api_key: 'YOUR_API_KEY',
+  api_secret: 'YOUR_API_SECRET',
+});
 
 // Add multiple images
 export const addImages = async (req, res) => {
@@ -9,7 +17,6 @@ export const addImages = async (req, res) => {
     const files = req.files;
 
     if (!files || files.length === 0) {
-      // Clean up temp files if any
       req.files?.forEach(file => {
         if (file.path) fs.unlink(file.path, () => {});
       });
@@ -17,21 +24,19 @@ export const addImages = async (req, res) => {
     }
 
     if (!imageTypesString || typeof imageTypesString !== 'string') {
-      // Cleanup
       files.forEach(file => {
         if (file.path) fs.unlink(file.path, () => {});
       });
-      return res.status(400).json({ success: false, message: "Invalid imageTypes string. Must be a comma-separated string." });
+      return res.status(400).json({ success: false, message: "Invalid imageTypes string" });
     }
 
     const imageTypes = imageTypesString.split(',').map(t => t.trim());
 
     if (imageTypes.length !== files.length) {
-      // Cleanup
       files.forEach(file => {
         if (file.path) fs.unlink(file.path, () => {});
       });
-      return res.status(400).json({ success: false, message: "Mismatch between imageTypes and uploaded files." });
+      return res.status(400).json({ success: false, message: "Mismatch between imageTypes and files" });
     }
 
     const uploadedImagesData = [];
@@ -46,9 +51,10 @@ export const addImages = async (req, res) => {
           folder: "your_upload_folder",
         });
 
-        if (uploadResult && uploadResult.secure_url) {
+        if (uploadResult && uploadResult.secure_url && uploadResult.public_id) {
           uploadedImagesData.push({
             imageUrl: uploadResult.secure_url,
+            publicId: uploadResult.public_id,
             imageType,
           });
         } else {
@@ -81,7 +87,7 @@ export const addImages = async (req, res) => {
     res.status(201).json({
       success: true,
       message: responseMessage,
-      images: createdImages, // includes _id
+      images: createdImages,
       failedUploads,
     });
   } catch (error) {
@@ -93,7 +99,7 @@ export const addImages = async (req, res) => {
   }
 };
 
-// Get images with limits
+// Get images (limit to 8 big and 7 small)
 export const getImage = async (req, res) => {
   try {
     const allImages = await ImageModel.find({});
@@ -110,9 +116,10 @@ export const getImage = async (req, res) => {
     res.json({
       success: true,
       images: limitedImages.map(i => ({
-        _id: i._id, // send _id for frontend
+        _id: i._id,
         imageUrl: i.imageUrl,
         imageType: i.imageType,
+        publicId: i.publicId, // optional, if needed
       })),
     });
   } catch (err) {
@@ -121,7 +128,7 @@ export const getImage = async (req, res) => {
   }
 };
 
-// Delete image by ID
+// Delete image by ID and from Cloudinary
 export const deleteImage = async (req, res) => {
   const { id } = req.params;
   try {
@@ -129,9 +136,17 @@ export const deleteImage = async (req, res) => {
     if (!image) {
       return res.status(404).json({ success: false, message: "Image not found" });
     }
+
+    // Delete from Cloudinary
+    if (image.publicId) {
+      await cloudinary.uploader.destroy(image.publicId);
+    }
+
+    // Remove from database
     await ImageModel.findByIdAndDelete(id);
     res.json({ success: true, message: "Image deleted" });
   } catch (err) {
+    console.error("Error deleting image:", err);
     res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 };
