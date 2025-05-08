@@ -14,8 +14,9 @@ connectCloudinary();
 app.use(express.json());
 app.use(cors({
     origin: [
-      "https://animation-front-eight.vercel.app",
-      "https://happy-society-five.vercel.app"
+        "https://animation-front-eight.vercel.app",
+        "https://happy-society-five.vercel.app",
+        "http://localhost:5173",
     ],
     credentials: true
   }));
